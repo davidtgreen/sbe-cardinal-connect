@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SBE Cardinal Connect - Academic Relationship Manager</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script>
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0YvEFKm3iLmIGqP6CkBEeMd6wtwIN33c",
+      authDomain: "sbe-cardinal-connect.firebaseapp.com",
+      databaseURL: "https://sbe-cardinal-connect-default-rtdb.firebaseio.com",
+      projectId: "sbe-cardinal-connect",
+      storageBucket: "sbe-cardinal-connect.firebasestorage.app",
+      messagingSenderId: "501918133820",
+      appId: "1:501918133820:web:dcd33d79f1962414b79d39",
+      measurementId: "G-YSF3YBRHV3"
+    };
+
+    // Initialize Firebase
+    let firebaseApp;
+    let db;
+    let auth;
+    
+    try {
+      firebaseApp = firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      auth = firebase.auth();
+      console.log('✅ Firebase initialized successfully');
+    } catch (error) {
+      console.error('❌ Firebase initialization error:', error);
+      alert('Firebase configuration needed. Please see setup instructions in the file.');
+    }
+  </script>
+  
+  <script type="text/babel">
+    const { useState, useMemo, useCallback, useEffect } = React;
+
+    // Icons (same as before - keeping compact)
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const icons = {
+        search: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
+        plus: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>,
+        calendar: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
+        bell: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+        users: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+        home: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>,
+        chart: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>,
+        settings: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>,
+        logout: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>,
+        x: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>,
+        check: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>,
+        edit: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+        trash: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+        clock: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>,
+        building: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>,
+        graduation: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>,
+        mail: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>,
+        phone: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.574 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+        mappin: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+        save: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>,
+        shield: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+        activity: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>,
+        filter: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/></svg>,
+        upload: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>,
+        download: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>,
+        user: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+        tag: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+        database: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+      };
+      return icons[name] || null;
+    };
+
+    // Constants
+    const ROLES = ['Alumni', 'Business Partner', 'Guest Speaker', 'Donor', 'Employer', 'Advisor', 'Faculty', 'Board Member'];
+    const ENGAGEMENT_TYPES = ['Meeting', 'Classroom Visit', 'Event', 'Panel Discussion', 'Collaboration', 'Site Visit', 'Phone Call', 'Email', 'Conference', 'Mentoring Session'];
+    const TAGS = ['Analytics', 'Internships', 'Advisory Board', 'Sustainability', 'Entrepreneurship', 'Finance', 'Marketing', 'Technology', 'Healthcare', 'Real Estate', 'Consulting', 'Non-Profit'];
+    const USER_ROLES = ['Admin', 'Editor', 'Viewer'];
+
+    // Utility Functions
+    const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+    const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    const formatDateTime = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+
+    // Firebase Hook for real-time data
+    const useFirebaseData = (path) => {
+      const [data, setData] = useState([]);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        if (!db) {
+          setLoading(false);
+          return;
+        }
+
+        const ref = db.ref(path);
+        
+        const handleData = (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            // Convert object to array
+            const arr = Object.keys(val).map(key => ({ ...val[key], id: key }));
+            setData(arr);
+          } else {
+            setData([]);
+          }
+          setLoading(false);
+        };
+
+        ref.on('value', handleData);
+        
+        return () => ref.off('value', handleData);
+      }, [path]);
+
+      return [data, loading];
+    };
+
+    // UI Components (same as before)
+    const Badge = ({ children, variant = 'default', size = 'md', onRemove }) => {
+      const v = { default: 'bg-slate-100 text-slate-700', primary: 'bg-emerald-50 text-emerald-700 border-emerald-200', secondary: 'bg-amber-50 text-amber-700 border-amber-200', accent: 'bg-indigo-50 text-indigo-700 border-indigo-200', success: 'bg-green-50 text-green-700 border-green-200', warning: 'bg-orange-50 text-orange-700 border-orange-200', info: 'bg-sky-50 text-sky-700 border-sky-200', danger: 'bg-red-50 text-red-700 border-red-200' };
+      const s = { sm: 'text-xs px-2 py-0.5', md: 'text-sm px-2.5 py-1' };
+      return (
+        <span className={`inline-flex items-center gap-1 font-medium rounded-full border ${v[variant]} ${s[size]}`}>
+          {children}
+          {onRemove && <button type="button" onClick={onRemove} className="ml-1 hover:bg-black hover:bg-opacity-10 rounded-full p-0.5"><Icon name="x" className="w-3 h-3" /></button>}
+        </span>
+      );
+    };
+
+    const Button = ({ children, variant = 'primary', size = 'md', onClick, disabled, className = '', icon, type = 'button' }) => {
+      const v = { primary: 'bg-emerald-600 text-white hover:bg-emerald-700', secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50', ghost: 'text-slate-600 hover:bg-slate-100', danger: 'bg-red-600 text-white hover:bg-red-700' };
+      const s = { sm: 'text-sm px-3 py-1.5', md: 'text-sm px-4 py-2', lg: 'text-base px-6 py-3' };
+      return <button type={type} onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${v[variant]} ${s[size]} ${className}`}>{icon && <Icon name={icon} className="w-4 h-4" />}{children}</button>;
+    };
+
+    const Input = ({ label, type = 'text', value, onChange, placeholder, icon, className = '', required }) => (
+      <div className={`space-y-1.5 ${className}`}>
+        {label && <label className="block text-sm font-medium text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>}
+        <div className="relative">
+          {icon && <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Icon name={icon} className="w-5 h-5 text-slate-400" /></div>}
+          <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} className={`w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none ${icon ? 'pl-10' : ''}`} />
+        </div>
+      </div>
+    );
+
+    const Select = ({ label, value, onChange, options, placeholder, className = '', required }) => (
+      <div className={`space-y-1.5 ${className}`}>
+        {label && <label className="block text-sm font-medium text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>}
+        <select value={value} onChange={(e) => onChange(e.target.value)} required={required} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none">
+          {placeholder && <option value="">{placeholder}</option>}
+          {(typeof options[0] === 'string' ? options.map(o => ({value: o, label: o})) : options).map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+        </select>
+      </div>
+    );
+
+    const TextArea = ({ label, value, onChange, placeholder, rows = 3, className = '' }) => (
+      <div className={`space-y-1.5 ${className}`}>
+        {label && <label className="block text-sm font-medium text-slate-700">{label}</label>}
+        <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={rows} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none" />
+      </div>
+    );
+
+    const Card = ({ children, className = '', hover, onClick }) => (
+      <div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 ${hover ? 'cursor-pointer transition-shadow hover:shadow-md' : ''} ${className}`}>{children}</div>
+    );
+
+    const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+      if (!isOpen) return null;
+      const sizes = { sm: 'max-w-md', md: 'max-w-2xl', lg: 'max-w-4xl' };
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+          <div className={`bg-white rounded-xl ${sizes[size]} w-full max-h-[90vh] flex flex-col`} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-semibold">{title}</h2>
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><Icon name="x" /></button>
+            </div>
+            <div className="p-6 overflow-y-auto scrollbar-thin">{children}</div>
+          </div>
+        </div>
+      );
+    };
+
+    const Avatar = ({ name, size = 'md' }) => {
+      const s = { sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-14 h-14 text-lg', xl: 'w-20 h-20 text-2xl' };
+      const initials = name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '??';
+      const bg = name ? `hsl(${name.charCodeAt(0) * 10 % 360}, 70%, 85%)` : '#e2e8f0';
+      const fg = name ? `hsl(${name.charCodeAt(0) * 10 % 360}, 70%, 30%)` : '#64748b';
+      return <div className={`${s[size]} rounded-full flex items-center justify-center font-semibold flex-shrink-0`} style={{ backgroundColor: bg, color: fg }}>{initials}</div>;
+    };
+
+    const StatCard = ({ label, value, icon, color = 'emerald' }) => {
+      const c = { emerald: 'bg-emerald-50 text-emerald-600', amber: 'bg-amber-50 text-amber-600', indigo: 'bg-indigo-50 text-indigo-600', rose: 'bg-rose-50 text-rose-600' };
+      return <Card className="p-5"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-slate-600">{label}</p><p className="text-3xl font-bold text-slate-900 mt-1">{value}</p></div><div className={`p-3 rounded-xl ${c[color]}`}><Icon name={icon} className="w-6 h-6" /></div></div></Card>;
+    };
+
+    const LoadingSpinner = () => (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+
+    // Contact Card
+    const ContactCard = ({ contact, onClick, engagementCount, lastEngagement }) => {
+      const rc = { 'Alumni': 'primary', 'Business Partner': 'secondary', 'Guest Speaker': 'accent', 'Donor': 'success', 'Employer': 'info', 'Advisor': 'warning' };
+      return (
+        <Card hover onClick={onClick} className="p-5">
+          <div className="flex items-start gap-4">
+            <Avatar name={`${contact.firstName} ${contact.lastName}`} size="lg" />
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-slate-900 truncate">{contact.firstName} {contact.lastName}</h3>
+              <p className="text-sm text-slate-600 truncate">{contact.title}</p>
+              <p className="text-sm text-slate-500 truncate">{contact.organization}</p>
+              <div className="flex flex-wrap gap-1.5 mt-3">{contact.roles?.slice(0, 3).map((r) => <Badge key={r} variant={rc[r] || 'default'} size="sm">{r}</Badge>)}</div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 text-sm text-slate-500"><Icon name="calendar" className="w-4 h-4" /><span>{engagementCount} engagements</span></div>
+            {lastEngagement && <span className="text-sm text-slate-400">Last: {formatDate(lastEngagement)}</span>}
+          </div>
+        </Card>
+      );
+    };
+
+    // Engagement Card
+    const EngagementCard = ({ engagement, contact, onClick, onEdit, canEdit }) => {
+      const ti = { 'Meeting': 'users', 'Classroom Visit': 'graduation', 'Event': 'calendar', 'Panel Discussion': 'users', 'Collaboration': 'users', 'Site Visit': 'building' };
+      return (
+        <Card hover className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-lg bg-slate-100 flex-shrink-0 cursor-pointer" onClick={onClick}><Icon name={ti[engagement.type] || 'calendar'} className="w-5 h-5 text-slate-600" /></div>
+            <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
+              <h4 className="font-medium text-slate-900 truncate">{engagement.title}</h4>
+              <p className="text-sm text-slate-600 mt-0.5">{engagement.type}</p>
+              {contact && <p className="text-sm text-emerald-600 mt-1">{contact.firstName} {contact.lastName}</p>}
+              <p className="text-sm text-slate-400 mt-2">{formatDate(engagement.date)}</p>
+            </div>
+            {canEdit && onEdit && <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-2 hover:bg-slate-100 rounded-lg flex-shrink-0"><Icon name="edit" className="w-4 h-4 text-slate-400" /></button>}
+          </div>
+        </Card>
+      );
+    };
+
+    // Follow-up Card  
+    const FollowUpCard = ({ followUp, contact, onToggle, onEdit, canEdit }) => {
+      const overdue = !followUp.completed && new Date(followUp.dueDate) < new Date();
+      return (
+        <Card className={`p-4 ${followUp.completed ? 'opacity-60' : ''}`}>
+          <div className="flex items-start gap-3">
+            <button onClick={(e) => { e.stopPropagation(); if(canEdit) onToggle(); }} className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${followUp.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-emerald-500'}`}>{followUp.completed && <Icon name="check" className="w-3 h-3" />}</button>
+            <div className="flex-1 min-w-0">
+              <h4 className={`font-medium ${followUp.completed ? 'line-through text-slate-500' : 'text-slate-900'}`}>{followUp.title}</h4>
+              {contact && <p className="text-sm text-slate-600 mt-0.5">{contact.firstName} {contact.lastName}</p>}
+              <div className="flex items-center gap-2 mt-2"><Icon name="clock" className={`w-4 h-4 ${overdue ? 'text-red-500' : 'text-slate-400'}`} /><span className={`text-sm ${overdue ? 'text-red-600 font-medium' : 'text-slate-500'}`}>{overdue ? 'Overdue: ' : 'Due: '}{formatDate(followUp.dueDate)}</span></div>
+            </div>
+            {canEdit && <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-2 hover:bg-slate-100 rounded-lg flex-shrink-0"><Icon name="edit" className="w-4 h-4 text-slate-400" /></button>}
+          </div>
+        </Card>
+      );
+    };
+
+    // Forms (keeping compact - same logic as before)
+    const ContactForm = ({ contact, onSave, onCancel, roles, tags, onAddRole, onAddTag }) => {
+      const [fd, setFd] = useState({ firstName: contact?.firstName || '', lastName: contact?.lastName || '', email: contact?.email || '', phone: contact?.phone || '', organization: contact?.organization || '', title: contact?.title || '', roles: contact?.roles || [], tags: contact?.tags || [], location: contact?.location || '', graduationYear: contact?.graduationYear || '' });
+      const [newRole, setNewRole] = useState('');
+      const [newTag, setNewTag] = useState('');
+      const toggle = (arr, item) => arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item];
+      const handleSubmit = (e) => { e.preventDefault(); if (fd.firstName && fd.lastName) onSave(fd); };
+      const handleAddRole = () => { if (newRole.trim()) { onAddRole(newRole.trim()); setFd(p => ({...p, roles: [...p.roles, newRole.trim()]})); setNewRole(''); }};
+      const handleAddTag = () => { if (newTag.trim()) { onAddTag(newTag.trim()); setFd(p => ({...p, tags: [...p.tags, newTag.trim()]})); setNewTag(''); }};
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4"><Input label="First Name" value={fd.firstName} onChange={v => setFd(p => ({...p, firstName: v}))} required /><Input label="Last Name" value={fd.lastName} onChange={v => setFd(p => ({...p, lastName: v}))} required /></div>
+          <div className="grid grid-cols-2 gap-4"><Input label="Email" type="email" value={fd.email} onChange={v => setFd(p => ({...p, email: v}))} icon="mail" /><Input label="Phone" value={fd.phone} onChange={v => setFd(p => ({...p, phone: v}))} icon="phone" /></div>
+          <div className="grid grid-cols-2 gap-4"><Input label="Organization" value={fd.organization} onChange={v => setFd(p => ({...p, organization: v}))} icon="building" /><Input label="Title" value={fd.title} onChange={v => setFd(p => ({...p, title: v}))} /></div>
+          <div className="grid grid-cols-2 gap-4"><Input label="Location" value={fd.location} onChange={v => setFd(p => ({...p, location: v}))} icon="mappin" /><Input label="Graduation Year" value={fd.graduationYear} onChange={v => setFd(p => ({...p, graduationYear: v}))} /></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-2">Roles</label><div className="flex flex-wrap gap-2 mb-2">{roles.map(r => <button key={r} type="button" onClick={() => setFd(p => ({...p, roles: toggle(p.roles, r)}))} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${fd.roles.includes(r) ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>{r}</button>)}</div><div className="flex gap-2"><input type="text" value={newRole} onChange={e => setNewRole(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddRole())} placeholder="Add new role..." className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-emerald-500 outline-none" /><Button type="button" variant="secondary" size="sm" onClick={handleAddRole} icon="plus">Add</Button></div></div>
+          <div><label className="block text-sm font-medium text-slate-700 mb-2">Tags</label><div className="flex flex-wrap gap-2 mb-2">{tags.map(t => <button key={t} type="button" onClick={() => setFd(p => ({...p, tags: toggle(p.tags, t)}))} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${fd.tags.includes(t) ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>{t}</button>)}</div><div className="flex gap-2"><input type="text" value={newTag} onChange={e => setNewTag(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddTag())} placeholder="Add new tag..." className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-emerald-500 outline-none" /><Button type="button" variant="secondary" size="sm" onClick={handleAddTag} icon="plus">Add</Button></div></div>
+          <div className="flex justify-end gap-3 pt-4 border-t"><Button variant="ghost" onClick={onCancel}>Cancel</Button><Button variant="primary" icon="save" type="submit">{contact?.id ? 'Save' : 'Create'}</Button></div>
+        </form>
+      );
+    };
+
+    const EngagementForm = ({ engagement, contacts, onSave, onCancel }) => {
+      const [fd, setFd] = useState({ contactId: engagement?.contactId || '', type: engagement?.type || '', title: engagement?.title || '', date: engagement?.date ? new Date(engagement.date).toISOString().slice(0, 16) : '', participants: engagement?.participants?.join(', ') || '', outcome: engagement?.outcome || '' });
+      const handleSubmit = (e) => { e.preventDefault(); if (fd.contactId && fd.type && fd.title && fd.date) onSave({ ...fd, participants: fd.participants.split(',').map(p => p.trim()).filter(Boolean), date: new Date(fd.date).toISOString() }); };
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Select label="Contact" value={fd.contactId} onChange={v => setFd(p => ({...p, contactId: v}))} options={contacts.map(c => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))} placeholder="Select contact" required />
+          <Input label="Title" value={fd.title} onChange={v => setFd(p => ({...p, title: v}))} placeholder="Brief description" required />
+          <div className="grid grid-cols-2 gap-4"><Select label="Type" value={fd.type} onChange={v => setFd(p => ({...p, type: v}))} options={ENGAGEMENT_TYPES} placeholder="Select type" required /><Input label="Date & Time" type="datetime-local" value={fd.date} onChange={v => setFd(p => ({...p, date: v}))} required /></div>
+          <Input label="Participants" value={fd.participants} onChange={v => setFd(p => ({...p, participants: v}))} placeholder="Comma-separated" />
+          <TextArea label="Outcome" value={fd.outcome} onChange={v => setFd(p => ({...p, outcome: v}))} rows={3} />
+          <div className="flex justify-end gap-3 pt-4 border-t"><Button variant="ghost" onClick={onCancel}>Cancel</Button><Button variant="primary" icon="save" type="submit">{engagement?.id ? 'Save' : 'Create'}</Button></div>
+        </form>
+      );
+    };
+
+    const FollowUpForm = ({ followUp, contacts, currentUser, onSave, onCancel }) => {
+      const [fd, setFd] = useState({ contactId: followUp?.contactId || '', title: followUp?.title || '', dueDate: followUp?.dueDate ? new Date(followUp.dueDate).toISOString().slice(0, 16) : '' });
+      const handleSubmit = (e) => { e.preventDefault(); if (fd.contactId && fd.title && fd.dueDate) onSave({ ...fd, dueDate: new Date(fd.dueDate).toISOString() }); };
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Select label="Contact" value={fd.contactId} onChange={v => setFd(p => ({...p, contactId: v}))} options={contacts.map(c => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))} placeholder="Select contact" required />
+          <Input label="Task" value={fd.title} onChange={v => setFd(p => ({...p, title: v}))} placeholder="What needs to be done?" required />
+          <Input label="Due Date" type="datetime-local" value={fd.dueDate} onChange={v => setFd(p => ({...p, dueDate: v}))} required />
+          <div className="flex justify-end gap-3 pt-4 border-t"><Button variant="ghost" onClick={onCancel}>Cancel</Button><Button variant="primary" icon="save" type="submit">{followUp?.id ? 'Save' : 'Create'}</Button></div>
+        </form>
+      );
+    };
+
+    const UserForm = ({ user, onSave, onCancel }) => {
+      const [form, setForm] = useState(user || { name: '', email: '', password: '', role: 'Viewer' });
+      const handleSubmit = (e) => { e.preventDefault(); if (form.name && form.email && form.role && (!user || form.password)) onSave(form); };
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input label="Full Name" value={form.name} onChange={v => setForm({...form, name: v})} required />
+          <Input label="Email" type="email" value={form.email} onChange={v => setForm({...form, email: v})} required />
+          {!user?.id && <Input label="Password" type="password" value={form.password} onChange={v => setForm({...form, password: v})} required />}
+          <Select label="Role" value={form.role} onChange={v => setForm({...form, role: v})} options={USER_ROLES} required />
+          <div className="flex gap-3 pt-4"><Button type="submit" variant="primary" className="flex-1">Save User</Button><Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button></div>
+        </form>
+      );
+    };
+
+    // Main App
+    function App() {
+      const [isAuth, setIsAuth] = useState(false);
+      const [user, setUser] = useState(null);
+      const [loginEmail, setLoginEmail] = useState('');
+      const [loginPassword, setLoginPassword] = useState('');
+      const [loginError, setLoginError] = useState('');
+      const [view, setView] = useState('dashboard');
+
+      // Firebase data hooks
+      const [contacts, contactsLoading] = useFirebaseData('contacts');
+      const [engagements, engagementsLoading] = useFirebaseData('engagements');
+      const [followUps, followUpsLoading] = useFirebaseData('followups');
+      const [users, usersLoading] = useFirebaseData('users');
+      const [customRoles, rolesLoading] = useFirebaseData('customRoles');
+      const [customTags, tagsLoading] = useFirebaseData('customTags');
+
+      const [search, setSearch] = useState('');
+      const [filters, setFilters] = useState({ role: '', tag: '', completed: undefined });
+      const [selectedContact, setSelectedContact] = useState(null);
+      const [showContactModal, setShowContactModal] = useState(false);
+      const [showEngagementModal, setShowEngagementModal] = useState(false);
+      const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+      const [showUserModal, setShowUserModal] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const [reportPeriod, setReportPeriod] = useState('30');
+
+      const canEdit = user?.role === 'Admin' || user?.role === 'Editor';
+      const isAdmin = user?.role === 'Admin';
+
+      // Initialize default data if empty
+      useEffect(() => {
+        if (!db || usersLoading) return;
+        
+        if (users.length === 0) {
+          // Initialize with default users
+          console.log('Initializing default users...');
+          const defaultUsers = [
+            { name: 'Dean Martinez', email: 'dean@business.edu', password: 'admin123', role: 'Admin' },
+            { name: 'Assistant Director', email: 'assistant@business.edu', password: 'editor123', role: 'Editor' },
+            { name: 'Program Coordinator', email: 'coordinator@business.edu', password: 'viewer123', role: 'Viewer' },
+          ];
+          defaultUsers.forEach(u => {
+            const id = generateId();
+            db.ref(`users/${id}`).set({ ...u, id }).then(() => {
+              console.log(`Created user: ${u.email}`);
+            });
+          });
+        }
+
+        if (customRoles.length === 0) {
+          console.log('Initializing default roles...');
+          ROLES.forEach(r => {
+            const id = generateId();
+            db.ref(`customRoles/${id}`).set({ name: r, id });
+          });
+        }
+
+        if (customTags.length === 0) {
+          console.log('Initializing default tags...');
+          TAGS.forEach(t => {
+            const id = generateId();
+            db.ref(`customTags/${id}`).set({ name: t, id });
+          });
+        }
+      }, [users, customRoles, customTags, usersLoading]);
+
+      const manualInitialize = () => {
+        const defaultUsers = [
+          { name: 'Dean Martinez', email: 'dean@business.edu', password: 'admin123', role: 'Admin' },
+          { name: 'Assistant Director', email: 'assistant@business.edu', password: 'editor123', role: 'Editor' },
+          { name: 'Program Coordinator', email: 'coordinator@business.edu', password: 'viewer123', role: 'Viewer' },
+        ];
+        defaultUsers.forEach(u => {
+          const id = generateId();
+          db.ref(`users/${id}`).set({ ...u, id });
+        });
+        ROLES.forEach(r => {
+          const id = generateId();
+          db.ref(`customRoles/${id}`).set({ name: r, id });
+        });
+        TAGS.forEach(t => {
+          const id = generateId();
+          db.ref(`customTags/${id}`).set({ name: t, id });
+        });
+        alert('Database initialized! Please wait 5 seconds and refresh the page.');
+      };
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        const u = users.find(u => u.email === loginEmail && u.password === loginPassword);
+        if (u) { setUser(u); setIsAuth(true); setLoginError(''); }
+        else setLoginError('Invalid email or password');
+      };
+
+      const handleLogout = () => { setIsAuth(false); setUser(null); setLoginEmail(''); setLoginPassword(''); };
+
+      const getContact = (id) => contacts.find(c => c.id === id);
+      const getEngCount = (cid) => engagements.filter(e => e.contactId === cid).length;
+      const getLastEng = (cid) => { const e = engagements.filter(e => e.contactId === cid).sort((a, b) => new Date(b.date) - new Date(a.date))[0]; return e?.date; };
+
+      const filteredContacts = useMemo(() => contacts.filter(c => {
+        const s = search === '' || `${c.firstName} ${c.lastName} ${c.organization} ${c.email}`.toLowerCase().includes(search.toLowerCase());
+        const r = filters.role === '' || c.roles?.includes(filters.role);
+        const t = filters.tag === '' || c.tags?.includes(filters.tag);
+        return s && r && t;
+      }), [contacts, search, filters]);
+
+      // Firebase CRUD operations
+      const saveContact = (data) => {
+        const now = new Date().toISOString();
+        if (editing?.id) {
+          db.ref(`contacts/${editing.id}`).update({ ...data, updatedBy: user.id, updatedAt: now });
+        } else {
+          const id = generateId();
+          db.ref(`contacts/${id}`).set({ ...data, id, notes: [], createdBy: user.id, createdAt: now, updatedBy: user.id, updatedAt: now });
+        }
+        setShowContactModal(false);
+        setEditing(null);
+      };
+
+      const deleteContact = (id) => {
+        if (window.confirm('Delete this contact?')) {
+          db.ref(`contacts/${id}`).remove();
+        }
+      };
+
+      const saveEngagement = (data) => {
+        const now = new Date().toISOString();
+        if (editing?.id) {
+          db.ref(`engagements/${editing.id}`).update({ ...data, updatedBy: user.id, updatedAt: now });
+        } else {
+          const id = generateId();
+          db.ref(`engagements/${id}`).set({ ...data, id, notes: [], createdBy: user.id, createdAt: now, updatedBy: user.id, updatedAt: now });
+        }
+        setShowEngagementModal(false);
+        setEditing(null);
+      };
+
+      const deleteEngagement = (id) => {
+        if (window.confirm('Delete this engagement?')) {
+          db.ref(`engagements/${id}`).remove();
+        }
+      };
+
+      const saveFollowUp = (data) => {
+        const now = new Date().toISOString();
+        if (editing?.id) {
+          db.ref(`followups/${editing.id}`).update({ ...data, assignedTo: user.id });
+        } else {
+          const id = generateId();
+          db.ref(`followups/${id}`).set({ ...data, id, completed: false, createdBy: user.id, createdAt: now, assignedTo: user.id });
+        }
+        setShowFollowUpModal(false);
+        setEditing(null);
+      };
+
+      const toggleFollowUp = (id) => {
+        const f = followUps.find(f => f.id === id);
+        if (f) {
+          db.ref(`followups/${id}`).update({ 
+            completed: !f.completed, 
+            completedAt: !f.completed ? new Date().toISOString() : null 
+          });
+        }
+      };
+
+      const deleteFollowUp = (id) => {
+        if (window.confirm('Delete this follow-up?')) {
+          db.ref(`followups/${id}`).remove();
+        }
+      };
+
+      const saveUser = (userData) => {
+        if (userData.id) {
+          db.ref(`users/${userData.id}`).update(userData);
+        } else {
+          const id = generateId();
+          db.ref(`users/${id}`).set({ ...userData, id });
+        }
+        setShowUserModal(false);
+        setEditing(null);
+      };
+
+      const deleteUser = (userId) => {
+        if (window.confirm('Delete this user?')) {
+          db.ref(`users/${userId}`).remove();
+        }
+      };
+
+      const addRole = (role) => {
+        const exists = customRoles.find(r => r.name === role);
+        if (!exists) {
+          const id = generateId();
+          db.ref(`customRoles/${id}`).set({ name: role, id });
+        }
+      };
+
+      const deleteRole = (roleId) => {
+        const role = customRoles.find(r => r.id === roleId);
+        if (role && window.confirm(`Delete role "${role.name}"?`)) {
+          db.ref(`customRoles/${roleId}`).remove();
+          // Remove from all contacts
+          contacts.forEach(c => {
+            if (c.roles?.includes(role.name)) {
+              db.ref(`contacts/${c.id}/roles`).set(c.roles.filter(r => r !== role.name));
+            }
+          });
+        }
+      };
+
+      const addTag = (tag) => {
+        const exists = customTags.find(t => t.name === tag);
+        if (!exists) {
+          const id = generateId();
+          db.ref(`customTags/${id}`).set({ name: tag, id });
+        }
+      };
+
+      const deleteTag = (tagId) => {
+        const tag = customTags.find(t => t.id === tagId);
+        if (tag && window.confirm(`Delete tag "${tag.name}"?`)) {
+          db.ref(`customTags/${tagId}`).remove();
+          // Remove from all contacts
+          contacts.forEach(c => {
+            if (c.tags?.includes(tag.name)) {
+              db.ref(`contacts/${c.id}/tags`).set(c.tags.filter(t => t !== tag.name));
+            }
+          });
+        }
+      };
+
+      const exportData = () => {
+        const data = { contacts, engagements, followUps, customRoles, customTags, users };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sbe-cardinal-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+      };
+
+      const reportData = useMemo(() => {
+        const cutoff = new Date(Date.now() - parseInt(reportPeriod) * 24 * 60 * 60 * 1000);
+        const recentEngagements = engagements.filter(e => new Date(e.date) >= cutoff);
+        const byType = {};
+        const byRole = {};
+        ENGAGEMENT_TYPES.forEach(t => byType[t] = 0);
+        customRoles.forEach(r => byRole[r.name] = 0);
+        recentEngagements.forEach(e => {
+          byType[e.type] = (byType[e.type] || 0) + 1;
+          const contact = getContact(e.contactId);
+          contact?.roles?.forEach(r => byRole[r] = (byRole[r] || 0) + 1);
+        });
+        const contactCounts = {};
+        recentEngagements.forEach(e => contactCounts[e.contactId] = (contactCounts[e.contactId] || 0) + 1);
+        const topContacts = Object.entries(contactCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, count]) => ({ contact: getContact(id), count }));
+        return { total: recentEngagements.length, byType, byRole, topContacts };
+      }, [engagements, reportPeriod, contacts, customRoles]);
+
+      // Login Screen
+      if (!isAuth) {
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-md p-8">
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-emerald-500 rounded-2xl mx-auto mb-4 flex items-center justify-center"><Icon name="graduation" className="w-10 h-10 text-white" /></div>
+                <h1 className="text-3xl font-bold text-slate-800 mb-2">SBE Cardinal Connect</h1>
+                <p className="text-slate-600">Academic Relationship Manager</p>
+                <div className="mt-4 flex items-center justify-center gap-2 text-sm text-emerald-600">
+                  <Icon name="database" className="w-4 h-4" />
+                  <span>Firebase Real-time Database</span>
+                </div>
+              </div>
+              {usersLoading ? (
+                <LoadingSpinner />
+              ) : users.length === 0 ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800 mb-3">
+                      <strong>First time setup:</strong> Your Firebase database is empty. Click the button below to initialize it with default users and settings.
+                    </p>
+                    <Button onClick={manualInitialize} variant="primary" className="w-full">
+                      Initialize Database
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-500 text-center">After initialization, refresh the page to login.</p>
+                </div>
+              ) : (
+                <>
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <Input label="Email" type="email" value={loginEmail} onChange={setLoginEmail} icon="mail" required />
+                    <Input label="Password" type="password" value={loginPassword} onChange={setLoginPassword} required />
+                    {loginError && <p className="text-sm text-red-600">{loginError}</p>}
+                    <Button type="submit" variant="primary" className="w-full">Sign In</Button>
+                  </form>
+                  <div className="mt-6 p-4 bg-slate-50 rounded-lg text-sm text-slate-600 space-y-1">
+                    <p className="font-semibold mb-2">Demo Accounts:</p>
+                    <p>Admin: dean@business.edu / admin123</p>
+                    <p>Editor: assistant@business.edu / editor123</p>
+                    <p>Viewer: coordinator@business.edu / viewer123</p>
+                  </div>
+                </>
+              )}
+            </Card>
+          </div>
+        );
+      }
+
+      const loading = contactsLoading || engagementsLoading || followUpsLoading;
+
+      // Main App
+      return (
+        <div className="min-h-screen bg-slate-50">
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3"><div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center"><Icon name="graduation" className="w-6 h-6 text-white" /></div><div><h1 className="text-2xl font-bold text-slate-800">SBE Cardinal Connect</h1><p className="text-xs text-slate-500 flex items-center gap-1"><Icon name="database" className="w-3 h-3" />Shared Database</p></div></div>
+                  <Badge variant="primary">{user.role}</Badge>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Avatar name={user.name} size="sm" />
+                  <span className="text-sm text-slate-600 hidden sm:block">{user.name}</span>
+                  <Button onClick={handleLogout} variant="ghost" icon="logout" size="sm">Logout</Button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <nav className="bg-white border-b border-slate-200 sticky top-16 z-30">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex gap-1 overflow-x-auto">
+                <button onClick={() => setView('dashboard')} className={`px-4 py-3 font-medium whitespace-nowrap ${view === 'dashboard' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-600 hover:text-slate-800'}`}>Dashboard</button>
+                <button onClick={() => setView('contacts')} className={`px-4 py-3 font-medium whitespace-nowrap ${view === 'contacts' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-600 hover:text-slate-800'}`}>Contacts</button>
+                <button onClick={() => setView('engagements')} className={`px-4 py-3 font-medium whitespace-nowrap ${view === 'engagements' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-600 hover:text-slate-800'}`}>Engagements</button>
+                <button onClick={() => setView('followups')} className={`px-4 py-3 font-medium whitespace-nowrap ${view === 'followups' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-600 hover:text-slate-800'}`}>Follow-ups</button>
+                <button onClick={() => setView('reports')} className={`px-4 py-3 font-medium whitespace-nowrap ${view === 'reports' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-600 hover:text-slate-800'}`}>Reports</button>
+                {isAdmin && <button onClick={() => setView('users')} className={`px-4 py-3 font-medium whitespace-nowrap ${view === 'users' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-600 hover:text-slate-800'}`}>Users</button>}
+                {isAdmin && <button onClick={() => setView('settings')} className={`px-4 py-3 font-medium whitespace-nowrap ${view === 'settings' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-600 hover:text-slate-800'}`}>Settings</button>}
+              </div>
+            </div>
+          </nav>
+
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {loading && view !== 'dashboard' ? (
+              <LoadingSpinner />
+            ) : (
+              <>
+                {view === 'dashboard' && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <StatCard label="Total Contacts" value={contacts.length} icon="users" color="emerald" />
+                      <StatCard label="Engagements" value={engagements.length} icon="calendar" color="indigo" />
+                      <StatCard label="Pending Tasks" value={followUps.filter(f => !f.completed).length} icon="bell" color="amber" />
+                      <StatCard label="Overdue Tasks" value={followUps.filter(f => !f.completed && new Date(f.dueDate) < new Date()).length} icon="clock" color="rose" />
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <Card className="p-6">
+                        <h3 className="text-lg font-semibold mb-4">Recent Engagements</h3>
+                        <div className="space-y-3">
+                          {engagements.slice(0, 5).sort((a, b) => new Date(b.date) - new Date(a.date)).map(e => {
+                            const c = getContact(e.contactId);
+                            return <div key={e.id} className="flex items-center justify-between py-2 border-b border-slate-100"><div><p className="font-medium text-slate-900">{e.title}</p><p className="text-sm text-slate-600">{c?.firstName} {c?.lastName}</p></div><span className="text-sm text-slate-400">{formatDate(e.date)}</span></div>;
+                          })}
+                          {engagements.length === 0 && <p className="text-slate-500 text-center py-4">No engagements yet</p>}
+                        </div>
+                      </Card>
+                      <Card className="p-6">
+                        <h3 className="text-lg font-semibold mb-4">Upcoming Follow-ups</h3>
+                        <div className="space-y-3">
+                          {followUps.filter(f => !f.completed).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)).slice(0, 5).map(f => {
+                            const c = getContact(f.contactId);
+                            const overdue = new Date(f.dueDate) < new Date();
+                            return <div key={f.id} className="flex items-center justify-between py-2 border-b border-slate-100"><div><p className="font-medium text-slate-900">{f.title}</p><p className="text-sm text-slate-600">{c?.firstName} {c?.lastName}</p></div><span className={`text-sm ${overdue ? 'text-red-600 font-medium' : 'text-slate-400'}`}>{formatDate(f.dueDate)}</span></div>;
+                          })}
+                          {followUps.filter(f => !f.completed).length === 0 && <p className="text-slate-500 text-center py-4">No pending follow-ups</p>}
+                        </div>
+                      </Card>
+                    </div>
+                  </div>
+                )}
+
+                {view === 'contacts' && (
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row gap-4 justify-between">
+                      <Input icon="search" placeholder="Search contacts..." value={search} onChange={setSearch} className="sm:w-96" />
+                      {canEdit && <Button onClick={() => { setEditing(null); setShowContactModal(true); }} variant="primary" icon="plus">Add Contact</Button>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Select value={filters.role} onChange={v => setFilters(p => ({...p, role: v}))} options={[{ value: '', label: 'All Roles' }, ...customRoles.map(r => ({ value: r.name, label: r.name }))]} className="w-48" />
+                      <Select value={filters.tag} onChange={v => setFilters(p => ({...p, tag: v}))} options={[{ value: '', label: 'All Tags' }, ...customTags.map(t => ({ value: t.name, label: t.name }))]} className="w-48" />
+                      {(filters.role || filters.tag) && <Button variant="ghost" size="sm" onClick={() => setFilters({ role: '', tag: '', completed: undefined })}>Clear Filters</Button>}
+                    </div>
+                    {filteredContacts.length === 0 ? (
+                      <div className="text-center py-16"><Icon name="users" className="w-12 h-12 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No contacts found</p></div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {filteredContacts.map(c => <ContactCard key={c.id} contact={c} onClick={() => setSelectedContact(c)} engagementCount={getEngCount(c.id)} lastEngagement={getLastEng(c.id)} />)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {view === 'engagements' && (
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row gap-4 justify-between">
+                      <Input icon="search" placeholder="Search engagements..." value={search} onChange={setSearch} className="sm:w-96" />
+                      {canEdit && <Button onClick={() => { setEditing(null); setShowEngagementModal(true); }} variant="primary" icon="plus">Add Engagement</Button>}
+                    </div>
+                    {engagements.length === 0 ? (
+                      <div className="text-center py-16"><Icon name="calendar" className="w-12 h-12 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No engagements yet</p></div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {engagements.filter(e => search === '' || e.title.toLowerCase().includes(search.toLowerCase())).sort((a, b) => new Date(b.date) - new Date(a.date)).map(e => <EngagementCard key={e.id} engagement={e} contact={getContact(e.contactId)} onClick={() => {}} onEdit={() => { setEditing(e); setShowEngagementModal(true); }} canEdit={canEdit} />)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {view === 'followups' && (
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row gap-4 justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant={filters.completed === false ? 'primary' : 'secondary'} onClick={() => setFilters(p => ({...p, completed: false}))}>Pending</Button>
+                        <Button variant={filters.completed === true ? 'primary' : 'secondary'} onClick={() => setFilters(p => ({...p, completed: true}))}>Completed</Button>
+                        <Button variant={filters.completed === undefined ? 'primary' : 'secondary'} onClick={() => setFilters(p => ({...p, completed: undefined}))}>All</Button>
+                      </div>
+                      {canEdit && <Button onClick={() => { setEditing(null); setShowFollowUpModal(true); }} variant="primary" icon="plus">Add Follow-up</Button>}
+                    </div>
+                    <div className="space-y-3">
+                      {followUps.filter(f => filters.completed === undefined || f.completed === filters.completed).sort((a, b) => a.completed - b.completed || new Date(a.dueDate) - new Date(b.dueDate)).map(f => <FollowUpCard key={f.id} followUp={f} contact={getContact(f.contactId)} onToggle={() => canEdit && toggleFollowUp(f.id)} onEdit={() => { if (canEdit) { setEditing(f); setShowFollowUpModal(true); }}} canEdit={canEdit} />)}
+                      {followUps.length === 0 && <div className="text-center py-16"><Icon name="bell" className="w-12 h-12 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No follow-ups yet</p></div>}
+                    </div>
+                  </div>
+                )}
+
+                {view === 'reports' && (
+                  <div className="space-y-6">
+                    <Select label="Period" value={reportPeriod} onChange={setReportPeriod} options={[{ value: '7', label: '7 days' }, { value: '30', label: '30 days' }, { value: '90', label: '90 days' }, { value: '365', label: '1 year' }]} className="w-48" />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <Card className="p-6"><h3 className="text-lg font-semibold mb-4">Engagements by Type</h3><div className="space-y-3">{Object.entries(reportData.byType).filter(([_, c]) => c > 0).sort((a, b) => b[1] - a[1]).map(([t, c]) => <div key={t} className="flex justify-between items-center"><span className="text-slate-700">{t}</span><Badge variant="primary">{c}</Badge></div>)}{Object.values(reportData.byType).every(v => v === 0) && <p className="text-slate-500 text-center py-4">No data for this period</p>}</div></Card>
+                      <Card className="p-6"><h3 className="text-lg font-semibold mb-4">Engagements by Role</h3><div className="space-y-3">{Object.entries(reportData.byRole).filter(([_, c]) => c > 0).sort((a, b) => b[1] - a[1]).map(([r, c]) => <div key={r} className="flex justify-between items-center"><span className="text-slate-700">{r}</span><Badge variant="secondary">{c}</Badge></div>)}{Object.values(reportData.byRole).every(v => v === 0) && <p className="text-slate-500 text-center py-4">No data for this period</p>}</div></Card>
+                      <Card className="p-6"><h3 className="text-lg font-semibold mb-4">Top Contacts</h3><div className="space-y-3">{reportData.topContacts.length === 0 ? <p className="text-slate-500 text-center py-4">No data for this period</p> : reportData.topContacts.map(({ contact: c, count }) => <div key={c?.id} className="flex items-center justify-between"><div className="flex items-center gap-3"><Avatar name={`${c?.firstName} ${c?.lastName}`} size="sm" /><span className="text-slate-700">{c?.firstName} {c?.lastName}</span></div><Badge variant="success">{count}</Badge></div>)}</div></Card>
+                      <Card className="p-6"><h3 className="text-lg font-semibold mb-4">Summary</h3><div className="space-y-2"><p className="text-slate-700"><span className="font-semibold text-2xl text-emerald-600">{reportData.total}</span> total engagements</p><p className="text-slate-600">in the last {reportPeriod} days</p><p className="text-slate-600">with <span className="font-semibold">{new Set(engagements.filter(e => new Date(e.date) >= new Date(Date.now() - parseInt(reportPeriod) * 24 * 60 * 60 * 1000)).map(e => e.contactId)).size}</span> unique contacts</p></div></Card>
+                    </div>
+                  </div>
+                )}
+
+                {view === 'users' && isAdmin && (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-2xl font-bold text-slate-800">User Management</h2>
+                      <Button onClick={() => { setEditing(null); setShowUserModal(true); }} variant="primary" icon="plus">Add User</Button>
+                    </div>
+                    <Card className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            <th className="text-left py-3 px-4 font-semibold text-slate-700">User</th>
+                            <th className="text-left py-3 px-4 font-semibold text-slate-700">Email</th>
+                            <th className="text-left py-3 px-4 font-semibold text-slate-700">Role</th>
+                            <th className="text-left py-3 px-4 font-semibold text-slate-700">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {users.map(u => (
+                            <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50">
+                              <td className="py-3 px-4"><div className="flex items-center gap-3"><Avatar name={u.name} size="sm" /><span className="font-medium text-slate-800">{u.name}</span></div></td>
+                              <td className="py-3 px-4 text-slate-600">{u.email}</td>
+                              <td className="py-3 px-4"><Badge variant={u.role === 'Admin' ? 'success' : u.role === 'Editor' ? 'primary' : 'default'}>{u.role}</Badge></td>
+                              <td className="py-3 px-4"><div className="flex gap-2"><button onClick={() => { setEditing(u); setShowUserModal(true); }} className="text-emerald-600 hover:text-emerald-700"><Icon name="edit" className="w-4 h-4" /></button><button onClick={() => deleteUser(u.id)} className="text-red-600 hover:text-red-700" disabled={u.id === user.id}><Icon name="trash" className="w-4 h-4" /></button></div></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </Card>
+                  </div>
+                )}
+
+                {view === 'settings' && isAdmin && (
+                  <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-slate-800">Settings</h2>
+                    
+                    <Card className="p-6">
+                      <h3 className="text-lg font-semibold mb-4">Manage Roles</h3>
+                      <div className="flex gap-2 mb-4">
+                        <Input placeholder="Enter new role name" className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim()) { addRole(e.target.value.trim()); e.target.value = ''; }}} />
+                        <Button onClick={(e) => { const input = e.target.closest('.p-6').querySelector('input'); if (input.value.trim()) { addRole(input.value.trim()); input.value = ''; }}} variant="primary" icon="plus">Add Role</Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {customRoles.map(role => (
+                          <Badge key={role.id} variant="primary" onRemove={() => deleteRole(role.id)}>{role.name}</Badge>
+                        ))}
+                      </div>
+                    </Card>
+
+                    <Card className="p-6">
+                      <h3 className="text-lg font-semibold mb-4">Manage Tags</h3>
+                      <div className="flex gap-2 mb-4">
+                        <Input placeholder="Enter new tag name" className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim()) { addTag(e.target.value.trim()); e.target.value = ''; }}} />
+                        <Button onClick={(e) => { const input = e.target.closest('.p-6').querySelector('input'); if (input.value.trim()) { addTag(input.value.trim()); input.value = ''; }}} variant="primary" icon="plus">Add Tag</Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {customTags.map(tag => (
+                          <Badge key={tag.id} variant="secondary" onRemove={() => deleteTag(tag.id)}>{tag.name}</Badge>
+                        ))}
+                      </div>
+                    </Card>
+
+                    <Card className="p-6">
+                      <h3 className="text-lg font-semibold mb-4">Data Management</h3>
+                      <div className="flex gap-3">
+                        <Button variant="secondary" onClick={exportData} icon="download">Export All Data</Button>
+                      </div>
+                      <p className="text-sm text-slate-500 mt-4">Data is automatically backed up in Firebase. Export creates a local JSON backup.</p>
+                    </Card>
+                  </div>
+                )}
+              </>
+            )}
+          </main>
+
+          {/* Modals */}
+          <Modal isOpen={showContactModal} onClose={() => { setShowContactModal(false); setEditing(null); }} title={editing?.id ? 'Edit Contact' : 'Add Contact'} size="lg">
+            <ContactForm contact={editing} onSave={saveContact} onCancel={() => { setShowContactModal(false); setEditing(null); }} roles={customRoles.map(r => r.name)} tags={customTags.map(t => t.name)} onAddRole={addRole} onAddTag={addTag} />
+          </Modal>
+
+          <Modal isOpen={showEngagementModal} onClose={() => { setShowEngagementModal(false); setEditing(null); }} title={editing?.id ? 'Edit Engagement' : 'Add Engagement'} size="lg">
+            <EngagementForm engagement={editing} contacts={contacts} onSave={saveEngagement} onCancel={() => { setShowEngagementModal(false); setEditing(null); }} />
+          </Modal>
+
+          <Modal isOpen={showFollowUpModal} onClose={() => { setShowFollowUpModal(false); setEditing(null); }} title={editing?.id ? 'Edit Follow-up' : 'Add Follow-up'}>
+            <FollowUpForm followUp={editing} contacts={contacts} currentUser={user} onSave={saveFollowUp} onCancel={() => { setShowFollowUpModal(false); setEditing(null); }} />
+          </Modal>
+
+          <Modal isOpen={showUserModal} onClose={() => { setShowUserModal(false); setEditing(null); }} title={editing?.id ? 'Edit User' : 'Add User'}>
+            <UserForm user={editing} onSave={saveUser} onCancel={() => { setShowUserModal(false); setEditing(null); }} />
+          </Modal>
+
+          {selectedContact && (
+            <Modal isOpen={!!selectedContact} onClose={() => setSelectedContact(null)} title="Contact Details" size="lg">
+              <div className="space-y-6">
+                <div className="flex items-start gap-4">
+                  <Avatar name={`${selectedContact.firstName} ${selectedContact.lastName}`} size="xl" />
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-slate-900">{selectedContact.firstName} {selectedContact.lastName}</h3>
+                    <p className="text-slate-600">{selectedContact.title}</p>
+                    <p className="text-slate-600">{selectedContact.organization}</p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {selectedContact.roles?.map(r => <Badge key={r} variant="primary">{r}</Badge>)}
+                      {selectedContact.tags?.map(t => <Badge key={t} variant="secondary">{t}</Badge>)}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {selectedContact.email && <div className="flex items-center gap-2"><Icon name="mail" className="w-4 h-4 text-slate-400" /><span className="text-slate-700">{selectedContact.email}</span></div>}
+                  {selectedContact.phone && <div className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4 text-slate-400" /><span className="text-slate-700">{selectedContact.phone}</span></div>}
+                  {selectedContact.location && <div className="flex items-center gap-2"><Icon name="mappin" className="w-4 h-4 text-slate-400" /><span className="text-slate-700">{selectedContact.location}</span></div>}
+                  {selectedContact.graduationYear && <div className="flex items-center gap-2"><Icon name="graduation" className="w-4 h-4 text-slate-400" /><span className="text-slate-700">Class of {selectedContact.graduationYear}</span></div>}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-2">Recent Engagements</h4>
+                  <div className="space-y-2">
+                    {engagements.filter(e => e.contactId === selectedContact.id).slice(0, 5).map(e => (
+                      <div key={e.id} className="flex justify-between items-center py-2 border-b border-slate-100">
+                        <div><p className="font-medium text-slate-900">{e.title}</p><p className="text-sm text-slate-600">{e.type}</p></div>
+                        <span className="text-sm text-slate-400">{formatDate(e.date)}</span>
+                      </div>
+                    ))}
+                    {engagements.filter(e => e.contactId === selectedContact.id).length === 0 && <p className="text-slate-500 text-center py-4">No engagements</p>}
+                  </div>
+                </div>
+                {canEdit && (
+                  <div className="flex gap-3 pt-4 border-t">
+                    <Button variant="primary" onClick={() => { setEditing(selectedContact); setSelectedContact(null); setShowContactModal(true); }} icon="edit">Edit Contact</Button>
+                    <Button variant="danger" onClick={() => { deleteContact(selectedContact.id); setSelectedContact(null); }} icon="trash">Delete</Button>
+                  </div>
+                )}
+              </div>
+            </Modal>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
